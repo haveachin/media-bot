@@ -7,6 +7,7 @@ import (
 	"log/slog"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/google/uuid"
 )
 
 func cmds() []*discordgo.ApplicationCommand {
@@ -77,14 +78,33 @@ func syncCommands(s *discordgo.Session, guildID string, desiredCommands []*disco
 	return nil
 }
 
-type Storage interface {
+type ObjectStorage interface {
 	PutVideo(ctx context.Context, name string, r io.Reader, size int64) (string, error)
 }
 
-func cmdHandler(storage Storage) func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+type Database interface {
+	InsertFileInfoRequest(
+		ctx context.Context,
+		username string,
+		requestedURL string,
+		fileSize int64,
+		fileHash []byte,
+	) (uuid.UUID, error)
+	InsertFileInfoURL(
+		ctx context.Context,
+		fileInfoID uuid.UUID,
+		url string,
+	) error
+	FileURLByHash(
+		ctx context.Context,
+		hash []byte,
+	) (string, error)
+}
+
+func cmdHandler(db Database, objStorage ObjectStorage) func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	return func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		cmdHandlers := map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate) error{
-			"video": cmdVideoHandler(storage),
+			"video": cmdVideoHandler(db, objStorage),
 		}
 
 		if h, ok := cmdHandlers[i.ApplicationCommandData().Name]; ok {
@@ -112,7 +132,7 @@ func cmdHandler(storage Storage) func(s *discordgo.Session, i *discordgo.Interac
 	}
 }
 
-func cmdVideoHandler(storage Storage) func(s *discordgo.Session, i *discordgo.InteractionCreate) error {
+func cmdVideoHandler(db Database, storage ObjectStorage) func(s *discordgo.Session, i *discordgo.InteractionCreate) error {
 	return func(s *discordgo.Session, i *discordgo.InteractionCreate) error {
 		args := i.ApplicationCommandData().Options
 		if len(args) < 1 {
@@ -120,7 +140,8 @@ func cmdVideoHandler(storage Storage) func(s *discordgo.Session, i *discordgo.In
 		}
 
 		url := args[0].StringValue()
-		videoURL, err := archiveVideo(storage, url)
+		username := i.Member.User.Username
+		videoURL, err := archiveVideo(db, storage, username, url)
 		if err != nil {
 			return err
 		}
