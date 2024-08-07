@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"log"
+	"log/slog"
 	"os"
 	"os/exec"
 	"strings"
@@ -13,7 +13,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func archiveVideo(storage Storage, url string) (string, error) {
+func downloadVideo(url string) (*os.File, error) {
 	ytdlpCmd := exec.Command(
 		"yt-dlp",
 		"--format", "bestvideo*+bestaudio/best",
@@ -22,38 +22,39 @@ func archiveVideo(storage Storage, url string) (string, error) {
 		url,
 	)
 
+	ytdlpCmd.Stderr = os.Stderr
+
 	ytdlpPipe, err := ytdlpCmd.StdoutPipe()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	if err := ytdlpCmd.Start(); err != nil {
-		return "", err
+		return nil, err
 	}
 
 	path, err := io.ReadAll(ytdlpPipe)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
+
+	slog.Info("Saved video", "path", path)
 
 	videoPath := strings.TrimSpace(string(path))
-	file, err := os.Open(videoPath)
-	if err != nil {
-		return "", err
-	}
-	defer func() {
-		file.Close()
-		os.Remove(videoPath)
-	}()
+	return os.Open(videoPath)
+}
 
+func uploadVideo(storage Storage, videoFile *os.File) (string, error) {
 	fileContentBuf := new(bytes.Buffer)
-	fileReader := io.TeeReader(file, fileContentBuf)
+	fileReader := io.TeeReader(videoFile, fileContentBuf)
 	hash, err := hash(fileReader)
 	if err != nil {
 		return "", err
 	}
 
-	log.Printf("File hash: %d", hash)
+	slog.Debug("Created file hash",
+		"hash", hash,
+	)
 
 	videoUID := uuid.New().String()
 	videoSize := int64(fileContentBuf.Len())

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"log/slog"
 	"media-bot/storage/object"
 	"os"
@@ -59,14 +58,23 @@ func run() error {
 		return err
 	}
 
-	videoURL, err := archiveVideo(objStorage, "https://fxtwitter.com/CandyRibons/status/1787557585765507434")
+	/*videoFile, err := downloadVideo("https://www.instagram.com/reels/C99X-PJIZ95/")
+	if err != nil {
+		return err
+	}
+	defer func() {
+		videoFile.Close()
+		os.Remove(videoFile.Name())
+	}()
+
+	videoURL, err := uploadVideo(objStorage, videoFile)
 	if err != nil {
 		return err
 	}
 
 	log.Println(videoURL)
 
-	return nil
+	return nil*/
 
 	sess, err := discordgo.New("Bot " + discordToken)
 	if err != nil {
@@ -87,12 +95,10 @@ func run() error {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	select {
-	case sig := <-sigChan:
-		slog.Info("Received exit signal",
-			slog.String("signal", sig.String()),
-		)
-	}
+	sig := <-sigChan
+	slog.Info("Received exit signal",
+		slog.String("signal", sig.String()),
+	)
 
 	return nil
 }

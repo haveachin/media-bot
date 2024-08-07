@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
 
 	"github.com/bwmarrin/discordgo"
 )
@@ -120,26 +121,43 @@ func cmdVideoHandler(storage Storage) func(s *discordgo.Session, i *discordgo.In
 		}
 
 		url := args[0].StringValue()
-		videoURL, err := archiveVideo(storage, url)
+		videoFile, err := downloadVideo(url)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			videoFile.Close()
+			os.Remove(videoFile.Name())
+		}()
+
+		info, err := videoFile.Stat()
 		if err != nil {
 			return err
 		}
 
-		content := fmt.Sprintf("[Video](%s)", videoURL)
+		fileIsBiggerThan25MB := info.Size() >= 26214400
+		if fileIsBiggerThan25MB {
+			videoURL, err := uploadVideo(storage, videoFile)
+			if err != nil {
+				return err
+			}
+
+			content := fmt.Sprintf("[Video](%s)", videoURL)
+			if _, err := s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+				Content: &content,
+			}); err != nil {
+				return err
+			}
+			return nil
+		}
+
 		if _, err := s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
-			Content: &content,
-			/*Embeds: &[]*discordgo.MessageEmbed{
+			Files: []*discordgo.File{
 				{
-					Type:  discordgo.EmbedTypeRich,
-					Title: "Your video king!",
-					URL:   videoURL,
-					Video: &discordgo.MessageEmbedVideo{
-						URL:    videoURL,
-						Width:  720,
-						Height: 1280,
-					},
+					Name:   "video.mp4",
+					Reader: videoFile,
 				},
-			},*/
+			},
 		}); err != nil {
 			return err
 		}
