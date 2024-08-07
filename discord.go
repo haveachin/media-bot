@@ -139,9 +139,9 @@ func cmdVideoHandler(db Database, storage ObjectStorage) func(s *discordgo.Sessi
 		if len(args) < 1 {
 			return fmt.Errorf("invalid args count")
 		}
-		
+
 		url := args[0].StringValue()
-		videoFile, err := downloadVideo(url)
+		videoFile, err := downloadVideo(storage, url)
 		if err != nil {
 			return err
 		}
@@ -157,7 +157,8 @@ func cmdVideoHandler(db Database, storage ObjectStorage) func(s *discordgo.Sessi
 
 		fileIsBiggerThan25MB := info.Size() >= 26214400
 		if fileIsBiggerThan25MB {
-			videoURL, err := uploadVideo(storage, videoFile)
+			username := i.Member.User.Username
+			videoURL, err := uploadVideo(db, storage, url, username, videoFile)
 			if err != nil {
 				return err
 			}

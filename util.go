@@ -5,7 +5,8 @@ import (
 	"context"
 	"errors"
 	"io"
-	"log"
+	"log/slog"
+	"media-bot/types"
 	"os"
 	"os/exec"
 	"strings"
@@ -13,7 +14,7 @@ import (
 	"github.com/cespare/xxhash/v2"
 )
 
-func archiveVideo(storage Storage, url string) (string, error) {
+func downloadVideo(storage ObjectStorage, url string) (*os.File, error) {
 	ytdlpCmd := exec.Command(
 		"yt-dlp",
 		"--format", "bestvideo*+bestaudio/best",
@@ -44,20 +45,17 @@ func archiveVideo(storage Storage, url string) (string, error) {
 	return os.Open(videoPath)
 }
 
-func uploadVideo(storage Storage, videoFile *os.File) (string, error) {
+func uploadVideo(db Database, objStorage ObjectStorage, url, username string, file *os.File) (string, error) {
 	fileContentBuf := new(bytes.Buffer)
 	fileReader := io.TeeReader(file, fileContentBuf)
-	hash, err := hash(fileReader)
+	videoHash, err := hash(fileReader)
 	if err != nil {
 		return "", err
 	}
 
-	slog.Info("File hash: %d", hash)
+	slog.Info("File hash: %d", "hash", videoHash)
 
-	videoUID := uuid.New().String()
 	videoSize := int64(fileContentBuf.Len())
-
-	log.Printf("File hash: %#v", videoHash)
 
 	ctx := context.Background()
 	videoID, err := db.InsertFileInfoRequest(ctx, username, url, videoSize, videoHash)

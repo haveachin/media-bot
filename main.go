@@ -81,7 +81,6 @@ func run() error {
 	log.Println(videoURL)
 
 	return nil*/
-	return nil*/
 
 	sess, err := discordgo.New("Bot " + discordToken)
 	if err != nil {
