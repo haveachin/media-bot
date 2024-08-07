@@ -3,6 +3,7 @@ package main
 import (
 	"log/slog"
 	"media-bot/storage/object"
+	"media-bot/storage/sqlite"
 	"os"
 	"os/signal"
 	"syscall"
@@ -53,6 +54,11 @@ func main() {
 }
 
 func run() error {
+	db, err := sqlite.New("./.dev/media-bot.db")
+	if err != nil {
+		return err
+	}
+
 	objStorage, err := object.New(minioEndpoint, minioAccessKey, minioSecretKey, minioBucketName, true)
 	if err != nil {
 		return err
@@ -75,6 +81,7 @@ func run() error {
 	log.Println(videoURL)
 
 	return nil*/
+	return nil*/
 
 	sess, err := discordgo.New("Bot " + discordToken)
 	if err != nil {
@@ -90,7 +97,7 @@ func run() error {
 		return err
 	}
 
-	sess.AddHandler(cmdHandler(objStorage))
+	sess.AddHandler(cmdHandler(db, objStorage))
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
